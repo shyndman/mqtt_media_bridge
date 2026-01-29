@@ -319,6 +319,43 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
         # For regular URLs, just truncate
         return f"{url[:max_length]}...[truncated {len(url)} chars total]"
 
+    # Override cached_property accessors from MediaPlayerEntity with regular
+    # properties so that updates to _attr_* are immediately visible.
+    @property
+    def media_title(self) -> str | None:
+        """Title of current playing media."""
+        return self._attr_media_title
+
+    @property
+    def media_artist(self) -> str | None:
+        """Artist of current playing media."""
+        return self._attr_media_artist
+
+    @property
+    def media_album_name(self) -> str | None:
+        """Album name of current playing media."""
+        return self._attr_media_album_name
+
+    @property
+    def media_duration(self) -> int | None:
+        """Duration of current playing media in seconds."""
+        return self._attr_media_duration
+
+    @property
+    def media_position(self) -> int | None:
+        """Position of current playing media in seconds."""
+        return self._attr_media_position
+
+    @property
+    def media_image_url(self) -> str | None:
+        """Image url of current playing media."""
+        return self._attr_media_image_url
+
+    @property
+    def volume_level(self) -> float | None:
+        """Volume level of the media player (0..1)."""
+        return self._attr_volume_level
+
     @callback
     def _prepare_subscribe_topics(self) -> None:
         """(Re)Subscribe to topics."""
