@@ -319,6 +319,53 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
         # For regular URLs, just truncate
         return f"{url[:max_length]}...[truncated {len(url)} chars total]"
 
+    def _dump_entity_state(self, label: str) -> None:
+        """Dump detailed entity state for debugging."""
+        _LOGGER.debug(
+            "[m3p STATE DUMP: %s] entity_id=%s, state=%s",
+            label,
+            getattr(self, "entity_id", "N/A"),
+            self.state,
+        )
+        _LOGGER.debug(
+            "[m3p STATE DUMP: %s] __dict__ keys=%s",
+            label,
+            list(self.__dict__.keys()),
+        )
+        _LOGGER.debug(
+            "[m3p STATE DUMP: %s] _attr_media_title=%r, _attr_media_artist=%r, _attr_media_album_name=%r",
+            label,
+            getattr(self, "_attr_media_title", "NOT_SET"),
+            getattr(self, "_attr_media_artist", "NOT_SET"),
+            getattr(self, "_attr_media_album_name", "NOT_SET"),
+        )
+        _LOGGER.debug(
+            "[m3p STATE DUMP: %s] _attr_media_duration=%r, _attr_media_position=%r, _attr_volume_level=%r",
+            label,
+            getattr(self, "_attr_media_duration", "NOT_SET"),
+            getattr(self, "_attr_media_position", "NOT_SET"),
+            getattr(self, "_attr_volume_level", "NOT_SET"),
+        )
+        _LOGGER.debug(
+            "[m3p STATE DUMP: %s] _attr_media_image_url=%r",
+            label,
+            getattr(self, "_attr_media_image_url", "NOT_SET"),
+        )
+        # Check what state_attributes would return
+        try:
+            attrs = self.state_attributes
+            _LOGGER.debug(
+                "[m3p STATE DUMP: %s] state_attributes=%s",
+                label,
+                attrs,
+            )
+        except Exception as e:
+            _LOGGER.debug(
+                "[m3p STATE DUMP: %s] state_attributes ERROR: %s",
+                label,
+                e,
+            )
+
     # Override cached_property accessors from MediaPlayerEntity with regular
     # properties so that updates to _attr_* are immediately visible.
     @property
@@ -531,8 +578,11 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
             _LOGGER.debug(
                 "🎵 TITLE MESSAGE RECEIVED on topic %s: %s", msg.topic, msg.payload
             )
+            self._dump_entity_state("BEFORE_TITLE_UPDATE")
             self._attr_media_title = self._decode_payload(msg.payload)
+            self._dump_entity_state("AFTER_ATTR_SET")
             self.async_write_ha_state()
+            self._dump_entity_state("AFTER_WRITE_HA_STATE")
             _LOGGER.debug("✅ Media title updated to: %s", self._attr_media_title)
             _LOGGER.info(
                 "[m3p] %s title update (topic=%s, title=%s)",
@@ -895,6 +945,7 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
             self._log_identity(),
             list(getattr(self, "_subscriptions", {}).keys()),
         )
+        self._dump_entity_state("AFTER_SUBSCRIBE_TOPICS")
 
     async def async_media_play(self) -> None:
         """Send a play command to the media player."""
