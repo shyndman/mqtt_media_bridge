@@ -425,6 +425,70 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
                 property_name,
             )
 
+    def _trace_state_calculation(self, label: str) -> None:
+        """Trace exactly what __async_calculate_state would calculate."""
+
+        _LOGGER.debug("[m3p TRACE %s] === START STATE CALCULATION ===", label)
+
+        # Trace each step of __async_calculate_state
+        try:
+            capability_attr = self.capability_attributes
+            _LOGGER.debug(
+                "[m3p TRACE %s] capability_attributes=%s", label, capability_attr
+            )
+        except Exception as e:
+            _LOGGER.debug("[m3p TRACE %s] capability_attributes ERROR: %s", label, e)
+            capability_attr = {}
+
+        attr = capability_attr.copy() if capability_attr else {}
+        _LOGGER.debug("[m3p TRACE %s] initial attr=%s", label, attr)
+
+        available = self.available
+        _LOGGER.debug("[m3p TRACE %s] available=%s", label, available)
+
+        # Trace state_attributes specifically
+        try:
+            state_attrs = self.state_attributes
+            _LOGGER.debug("[m3p TRACE %s] state_attributes=%s", label, state_attrs)
+            if state_attrs:
+                attr.update(state_attrs)
+                _LOGGER.debug(
+                    "[m3p TRACE %s] attr after state_attributes merge=%s", label, attr
+                )
+        except Exception as e:
+            _LOGGER.debug("[m3p TRACE %s] state_attributes ERROR: %s", label, e)
+
+        # Trace extra_state_attributes
+        try:
+            extra_attrs = self.extra_state_attributes
+            _LOGGER.debug(
+                "[m3p TRACE %s] extra_state_attributes=%s", label, extra_attrs
+            )
+            if extra_attrs:
+                attr.update(extra_attrs)
+                _LOGGER.debug(
+                    "[m3p TRACE %s] attr after extra_state_attributes merge=%s",
+                    label,
+                    attr,
+                )
+        except Exception as e:
+            _LOGGER.debug("[m3p TRACE %s] extra_state_attributes ERROR: %s", label, e)
+
+        # Check entity_picture specifically
+        try:
+            entity_picture = self.entity_picture
+            _LOGGER.debug("[m3p TRACE %s] entity_picture=%s", label, entity_picture)
+        except Exception as e:
+            _LOGGER.debug("[m3p TRACE %s] entity_picture ERROR: %s", label, e)
+
+        _LOGGER.debug(
+            "[m3p TRACE %s] === FINAL ATTR (what should be written to state machine) ===",
+            label,
+        )
+        for key, value in sorted(attr.items()):
+            _LOGGER.debug("[m3p TRACE %s]   %s=%r", label, key, value)
+        _LOGGER.debug("[m3p TRACE %s] === END STATE CALCULATION ===", label)
+
     @callback
     def _prepare_subscribe_topics(self) -> None:
         """(Re)Subscribe to topics."""
@@ -609,6 +673,7 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
 
             self._diagnose_attr_property("media_title")
             self._dump_entity_state("AFTER_ATTR_SET")
+            self._trace_state_calculation("AFTER_ATTR_SET")
 
             # Explicitly invalidate the cached property
             self._invalidate_cached_property("media_title")
@@ -616,6 +681,7 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
 
             self.async_write_ha_state()
             self._dump_entity_state("AFTER_WRITE_HA_STATE")
+            self._trace_state_calculation("AFTER_WRITE_HA_STATE")
             _LOGGER.debug("✅ Media title updated to: %s", self._attr_media_title)
             _LOGGER.info(
                 "[m3p] %s title update (topic=%s, title=%s)",
