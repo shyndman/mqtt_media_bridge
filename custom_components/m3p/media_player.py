@@ -174,6 +174,9 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
         """Initialize the MQTT media player."""
         _LOGGER.debug("MqttMediaPlayer.__init__ called with config: %s", config)
 
+        # Log the MRO to understand the class hierarchy
+        _LOGGER.debug("[m3p MRO] %s", [c.__name__ for c in self.__class__.__mro__])
+
         # Initialize the base MqttEntity with discovery data
         super().__init__(hass, config, config_entry, discovery_data)
 
@@ -187,6 +190,13 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
             self._m3p_discovery_present,
             config_keys,
         )
+
+        # Check the type of _attr_media_title after super().__init__
+        attr_type = type(
+            self.__class__.__dict__.get("_attr_media_title", "NOT_IN_DICT")
+        ).__name__
+        _LOGGER.debug("[m3p INIT] _attr_media_title type in class: %s", attr_type)
+        self._diagnose_attr_property("media_title")
 
         _LOGGER.debug("MqttMediaPlayer initialized successfully")
 
@@ -364,6 +374,55 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
                 "[m3p STATE DUMP: %s] state_attributes ERROR: %s",
                 label,
                 e,
+            )
+
+    def _diagnose_attr_property(self, attr_name: str) -> None:
+        """Diagnose if an _attr_* property is properly wrapped by the metaclass."""
+        # Get the class attribute (not instance)
+        cls = self.__class__
+        full_attr_name = f"_attr_{attr_name}"
+
+        # Check if it's in the class __dict__
+        in_class_dict = full_attr_name in cls.__dict__
+
+        # Get the attribute type
+        attr_value = getattr(cls, full_attr_name, None)
+        attr_type = type(attr_value).__name__ if attr_value is not None else "None"
+
+        # Check instance __dict__ for the private backing attribute
+        private_attr = f"__attr_{attr_name}"
+        in_instance_dict = private_attr in self.__dict__
+        backing_value = self.__dict__.get(private_attr, "NOT_FOUND")
+
+        # Check if the cached_property value is in instance __dict__
+        cached_in_dict = attr_name in self.__dict__
+        cached_value = self.__dict__.get(attr_name, "NOT_CACHED")
+
+        _LOGGER.debug(
+            "[m3p DIAGNOSE %s] in_class_dict=%s, type=%s, in_instance_dict=%s, backing=%r, cached_in_dict=%s, cached=%r",
+            full_attr_name,
+            in_class_dict,
+            attr_type,
+            in_instance_dict,
+            backing_value,
+            cached_in_dict,
+            cached_value,
+        )
+
+    def _invalidate_cached_property(self, property_name: str) -> None:
+        """Explicitly invalidate a cached_property by removing it from __dict__."""
+        if property_name in self.__dict__:
+            old_value = self.__dict__[property_name]
+            del self.__dict__[property_name]
+            _LOGGER.debug(
+                "[m3p INVALIDATE] Removed %s from __dict__ (was: %r)",
+                property_name,
+                old_value,
+            )
+        else:
+            _LOGGER.debug(
+                "[m3p INVALIDATE] %s not in __dict__, no action needed",
+                property_name,
             )
 
     # Override cached_property accessors from MediaPlayerEntity with regular
@@ -579,8 +638,19 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
                 "🎵 TITLE MESSAGE RECEIVED on topic %s: %s", msg.topic, msg.payload
             )
             self._dump_entity_state("BEFORE_TITLE_UPDATE")
-            self._attr_media_title = self._decode_payload(msg.payload)
+            self._diagnose_attr_property("media_title")
+
+            decoded = self._decode_payload(msg.payload)
+            _LOGGER.debug("[m3p] Setting _attr_media_title = %r", decoded)
+            self._attr_media_title = decoded
+
+            self._diagnose_attr_property("media_title")
             self._dump_entity_state("AFTER_ATTR_SET")
+
+            # Explicitly invalidate the cached property
+            self._invalidate_cached_property("media_title")
+            self._diagnose_attr_property("media_title")
+
             self.async_write_ha_state()
             self._dump_entity_state("AFTER_WRITE_HA_STATE")
             _LOGGER.debug("✅ Media title updated to: %s", self._attr_media_title)
