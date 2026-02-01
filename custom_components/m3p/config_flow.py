@@ -42,7 +42,7 @@ class MqttMediaPlayerConfigFlow(ConfigFlow, domain=DOMAIN):
     ) -> ConfigFlowResult:
         """Handle MQTT discovery."""
         payload_preview = self._summarize_payload(discovery_info.payload)
-        _LOGGER.info(
+        _LOGGER.debug(
             "[m3p] MQTT discovery triggered (topic=%s, payload_preview=%s)",
             discovery_info.topic,
             payload_preview,
@@ -52,13 +52,13 @@ class MqttMediaPlayerConfigFlow(ConfigFlow, domain=DOMAIN):
         try:
             if not discovery_info.payload:
                 # Empty payload means device removal
-                _LOGGER.info(
+                _LOGGER.debug(
                     "[m3p] Empty discovery payload received for topic=%s",
                     discovery_info.topic,
                 )
                 for entry in self._async_current_entries():
                     if entry.data.get("discovery_topic") == discovery_info.topic:
-                        _LOGGER.info(
+                        _LOGGER.debug(
                             "[m3p] Removing config entry for topic=%s (entry_id=%s)",
                             discovery_info.topic,
                             entry.entry_id,
@@ -69,7 +69,7 @@ class MqttMediaPlayerConfigFlow(ConfigFlow, domain=DOMAIN):
 
             payload = json.loads(discovery_info.payload)
         except (json.JSONDecodeError, ValueError) as err:
-            _LOGGER.info(
+            _LOGGER.debug(
                 "[m3p] Invalid JSON in discovery payload (topic=%s, error=%s)",
                 discovery_info.topic,
                 err,
@@ -79,14 +79,14 @@ class MqttMediaPlayerConfigFlow(ConfigFlow, domain=DOMAIN):
         # Extract unique identifier from payload
         unique_id = payload.get("unique_id")
         if not unique_id:
-            _LOGGER.info(
+            _LOGGER.debug(
                 "[m3p] Discovery payload missing unique_id (topic=%s, keys=%s)",
                 discovery_info.topic,
                 sorted(payload.keys()),
             )
             return self.async_abort(reason="no_unique_id")
 
-        _LOGGER.info(
+        _LOGGER.debug(
             "[m3p] Discovery payload accepted (topic=%s, unique_id=%s, name=%s, keys=%s)",
             discovery_info.topic,
             unique_id,
@@ -108,7 +108,7 @@ class MqttMediaPlayerConfigFlow(ConfigFlow, domain=DOMAIN):
         if device_info := payload.get("device"):
             device_name = device_info.get("name", device_name)
 
-        _LOGGER.info(
+        _LOGGER.debug(
             "[m3p] Creating/Updating config entry for unique_id=%s (device_name=%s, entry_title=%s)",
             unique_id,
             device_name,

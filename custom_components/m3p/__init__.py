@@ -20,13 +20,13 @@ _LOGGER = logging.getLogger(__name__)
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Set up the Mellow MQTT Media component."""
     config_domains = list(config.keys()) if isinstance(config, dict) else []
-    _LOGGER.info("[m3p] async_setup invoked (config_domains=%s)", config_domains)
+    _LOGGER.debug("[m3p] async_setup invoked (config_domains=%s)", config_domains)
     return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Mellow MQTT Media from a config entry."""
-    _LOGGER.info(
+    _LOGGER.debug(
         "[m3p] async_setup_entry start (entry_id=%s, title=%s, data_keys=%s)",
         entry.entry_id,
         entry.title,
@@ -40,23 +40,23 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             entry.entry_id,
         )
         return False
-    _LOGGER.info("[m3p] MQTT client ready for entry_id=%s", entry.entry_id)
+    _LOGGER.debug("[m3p] MQTT client ready for entry_id=%s", entry.entry_id)
 
     # Forward the entry setup to the media_player platform
     # Entity creation happens directly in media_player.async_setup_entry
     await hass.config_entries.async_forward_entry_setups(entry, ["media_player"])
-    _LOGGER.info(
+    _LOGGER.debug(
         "[m3p] Entry forwarded to media_player platform (entry_id=%s)",
         entry.entry_id,
     )
 
-    _LOGGER.info("[m3p] async_setup_entry complete (entry_id=%s)", entry.entry_id)
+    _LOGGER.debug("[m3p] async_setup_entry complete (entry_id=%s)", entry.entry_id)
     return True
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
-    _LOGGER.info("[m3p] async_unload_entry start (entry_id=%s)", entry.entry_id)
+    _LOGGER.debug("[m3p] async_unload_entry start (entry_id=%s)", entry.entry_id)
 
     # Note: We don't clean up mqtt_data.config here because:
     # 1. It's a shared MQTT structure
@@ -66,7 +66,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     unload_success = await hass.config_entries.async_unload_platforms(
         entry, ["media_player"]
     )
-    _LOGGER.info(
+    _LOGGER.debug(
         "[m3p] async_unload_entry complete (entry_id=%s, success=%s)",
         entry.entry_id,
         unload_success,
