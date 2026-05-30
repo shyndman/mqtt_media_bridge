@@ -1,4 +1,4 @@
-# Mellow MQTT Media Player (M3P)
+# MQTT Media Bridge
 
 A Home Assistant custom component that creates MQTT-based media players with full playback control and media metadata support.
 
@@ -18,16 +18,16 @@ A Home Assistant custom component that creates MQTT-based media players with ful
 1. Open HACS in your Home Assistant instance
 2. Click on "Integrations"
 3. Click the three dots in the top right corner and select "Custom repositories"
-4. Add `https://github.com/shyndman/m3p` as a custom repository with category "Integration"
-5. Click "Install" on the Mellow MQTT Media Player card
+4. Add `https://github.com/shyndman/mqtt_media_bridge` as a custom repository with category "Integration"
+5. Click "Install" on the MQTT Media Bridge card
 6. Restart Home Assistant
 
 ### Manual Installation
 
-1. Download the latest release from the [releases page](https://github.com/shyndman/m3p/releases)
-2. Extract the `m3p` folder to your `custom_components` directory:
+1. Download the latest release from the [releases page](https://github.com/shyndman/mqtt_media_bridge/releases)
+2. Extract the `mqtt_media_bridge` folder to your `custom_components` directory:
    ```
-   <config_dir>/custom_components/m3p/
+   <config_dir>/custom_components/mqtt_media_bridge/
    ```
 3. Restart Home Assistant
 
@@ -123,8 +123,8 @@ mosquitto_sub -t "media/player/cmd/+"
 
 ```bash
 # Clone the repository
-git clone https://github.com/shyndman/m3p.git
-cd m3p
+git clone https://github.com/shyndman/mqtt_media_bridge.git
+cd mqtt_media_bridge
 
 # Run development setup
 ./scripts/setup
@@ -174,8 +174,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 If you encounter any issues or have questions:
 
 1. Check the [troubleshooting section](#troubleshooting) above
-2. Search [existing issues](https://github.com/shyndman/m3p/issues)
-3. Create a [new issue](https://github.com/shyndman/m3p/issues/new) if needed
+2. Search [existing issues](https://github.com/shyndman/mqtt_media_bridge/issues)
+3. Create a [new issue](https://github.com/shyndman/mqtt_media_bridge/issues/new) if needed
 
 ## Acknowledgments
 

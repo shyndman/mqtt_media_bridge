@@ -10,4 +10,4 @@ logger:
   default: info
   logs:
     mqtt: debug
-    custom_components.m3p: debug
+    custom_components.mqtt_media_bridge: debug

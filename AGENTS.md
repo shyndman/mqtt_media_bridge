@@ -20,7 +20,7 @@ Keep this managed block so 'openspec update' can refresh the instructions.
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-- Custom component code lives in `custom_components/m3p/` (`__init__.py`, `media_player.py`, `entity.py`, `config_flow.py`, `const.py`, `manifest.json`). Treat this as the single source of Home Assistant integration logic.
+- Custom component code lives in `custom_components/mqtt_media_bridge/` (`__init__.py`, `media_player.py`, `entity.py`, `config_flow.py`, `const.py`, `manifest.json`). Treat this as the single source of Home Assistant integration logic.
 - Local Home Assistant test configuration sits under `config/` (blueprints, temporary databases, `configuration.yaml`, `mosquitto.conf`). Use it when running the bundled dev instance.
 - Helper scripts (`setup`, `develop`, `lint`) are in `scripts/`; they wrap environment bootstrapping, HA launch, and linting.
 - Repository metadata—`requirements.txt`, `hacs.json`, `README.md`, and licensing—lives at the root for HACS compatibility.
@@ -28,12 +28,12 @@ Keep this managed block so 'openspec update' can refresh the instructions.
 ## Build, Test & Development Commands
 - `./scripts/setup` installs Python deps (see `requirements.txt`) and prepares the virtual environment.
 - `./scripts/develop` launches the pinned Home Assistant version with the sample config; point your browser to the URL it prints to exercise flows end-to-end.
-- `./scripts/lint` runs Ruff across `custom_components/m3p`.
+- `./scripts/lint` runs Ruff across `custom_components/mqtt_media_bridge`.
 - When iterating manually, use Home Assistant’s MQTT panel plus `mosquitto_pub`/`mosquitto_sub` to simulate player state (`config/mosquitto.conf` shows the expected broker setup).
 
 ## Coding Style & Naming Conventions
 - Python modules follow Home Assistant standards: 4-space indentation, snake_case functions, PascalCase classes, upper snake constants defined in `const.py`.
-- Keep public strings and keys aligned with Home Assistant’s translation/domain expectations (domain name `m3p`, config entry IDs, etc.).
+- Keep public strings and keys aligned with Home Assistant’s translation/domain expectations (domain name `mqtt_media_bridge`, config entry IDs, etc.).
 - Ruff enforces formatting and lint rules; fix reported issues before opening a PR (`ruff --fix ...` is acceptable locally).
 
 ## Testing Guidelines
@@ -48,4 +48,4 @@ Keep this managed block so 'openspec update' can refresh the instructions.
 
 ## Security & Configuration Tips
 - Never commit real broker credentials or tokens; use sample values in docs and keep secrets in your local `.env` or HA secrets store.
-- Confirm `config/mosquitto.conf` and `custom_components/m3p/const.py` remain in sync regarding topic defaults and discovery prefixes.
+- Confirm `config/mosquitto.conf` and `custom_components/mqtt_media_bridge/const.py` remain in sync regarding topic defaults and discovery prefixes.

@@ -1,4 +1,4 @@
-"""Support for Mellow MQTT Media Players."""
+"""Support for MQTT Media Bridge media players."""
 
 from __future__ import annotations
 
@@ -36,7 +36,7 @@ from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
 from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN
 from homeassistant.util.dt import utcnow
 
-from custom_components.m3p.const import (
+from custom_components.mqtt_media_bridge.const import (
     CONF_MEDIA_ALBUM_NAME_TOPIC,
     CONF_MEDIA_ARTIST_TOPIC,
     CONF_MEDIA_DURATION_TOPIC,
@@ -98,18 +98,18 @@ async def async_setup_entry(
 ) -> None:
     """Set up MQTT media player from a config entry."""
     _LOGGER.debug(
-        "[m3p] media_player.async_setup_entry called (entry_id=%s)",
+        "[mmb] media_player.async_setup_entry called (entry_id=%s)",
         config_entry.entry_id,
     )
     mqtt_ready = await mqtt.async_wait_for_mqtt_client(hass)
     if not mqtt_ready:
         _LOGGER.warning(
-            "[m3p] MQTT client not ready inside media_player platform (entry_id=%s)",
+            "[mmb] MQTT client not ready inside media_player platform (entry_id=%s)",
             config_entry.entry_id,
         )
         return
     _LOGGER.debug(
-        "[m3p] MQTT client ready for media_player platform (entry_id=%s)",
+        "[mmb] MQTT client ready for media_player platform (entry_id=%s)",
         config_entry.entry_id,
     )
 
@@ -119,7 +119,7 @@ async def async_setup_entry(
 
     if not discovery_payload:
         _LOGGER.error(
-            "[m3p] No discovery payload in config entry (entry_id=%s)",
+            "[mmb] No discovery payload in config entry (entry_id=%s)",
             config_entry.entry_id,
         )
         return
@@ -129,7 +129,7 @@ async def async_setup_entry(
         config = DISCOVERY_SCHEMA(discovery_payload)
     except vol.Invalid as err:
         _LOGGER.error(
-            "[m3p] Invalid discovery payload (entry_id=%s, error=%s)",
+            "[mmb] Invalid discovery payload (entry_id=%s, error=%s)",
             config_entry.entry_id,
             err,
         )
@@ -149,7 +149,7 @@ async def async_setup_entry(
     }
 
     _LOGGER.debug(
-        "[m3p] Creating entity directly (entry_id=%s, discovery_hash=%s)",
+        "[mmb] Creating entity directly (entry_id=%s, discovery_hash=%s)",
         config_entry.entry_id,
         discovery_hash,
     )
@@ -175,19 +175,19 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
         _LOGGER.debug("MqttMediaPlayer.__init__ called with config: %s", config)
 
         # Log the MRO to understand the class hierarchy
-        _LOGGER.debug("[m3p MRO] %s", [c.__name__ for c in self.__class__.__mro__])
+        _LOGGER.debug("[mmb MRO] %s", [c.__name__ for c in self.__class__.__mro__])
 
         # Initialize the base MqttEntity with discovery data
         super().__init__(hass, config, config_entry, discovery_data)
 
-        self._m3p_entry_id = config_entry.entry_id
-        self._m3p_discovery_present = discovery_data is not None
+        self._mmb_entry_id = config_entry.entry_id
+        self._mmb_discovery_present = discovery_data is not None
         config_keys = sorted(config.keys()) if isinstance(config, dict) else []
         _LOGGER.debug(
-            "[m3p] MqttMediaPlayer init (entry_id=%s, entity_id=%s, discovery=%s, config_keys=%s)",
-            self._m3p_entry_id,
+            "[mmb] MqttMediaPlayer init (entry_id=%s, entity_id=%s, discovery=%s, config_keys=%s)",
+            self._mmb_entry_id,
             getattr(self, "entity_id", None),
-            self._m3p_discovery_present,
+            self._mmb_discovery_present,
             config_keys,
         )
 
@@ -195,7 +195,7 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
         attr_type = type(
             self.__class__.__dict__.get("_attr_media_title", "NOT_IN_DICT")
         ).__name__
-        _LOGGER.debug("[m3p INIT] _attr_media_title type in class: %s", attr_type)
+        _LOGGER.debug("[mmb INIT] _attr_media_title type in class: %s", attr_type)
 
         _LOGGER.debug("MqttMediaPlayer initialized successfully")
 
@@ -211,7 +211,7 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
             return self.entity_id
         if getattr(self, "unique_id", None):
             return f"unique_id={self.unique_id}"
-        return f"entry_id={self._m3p_entry_id}"
+        return f"entry_id={self._mmb_entry_id}"
 
     def _setup_from_config(self, config: ConfigType) -> None:
         """(Re)Setup the entity."""
@@ -269,7 +269,7 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
             ", ".join(feature_topics),
         )
         _LOGGER.debug(
-            "[m3p] %s supported_features=%s topics=%s",
+            "[mmb] %s supported_features=%s topics=%s",
             self._log_identity(),
             features,
             feature_topics or "<none>",
@@ -365,7 +365,7 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
             if self._config.get(topic_key)
         }
         _LOGGER.debug(
-            "[m3p] %s preparing MQTT subscriptions (configured_topics=%s)",
+            "[mmb] %s preparing MQTT subscriptions (configured_topics=%s)",
             self._log_identity(),
             configured_topics or "<none>",
         )
@@ -412,7 +412,7 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
             self.async_write_ha_state()
             _LOGGER.debug("✅ State updated to: %s", self._attr_state)
             _LOGGER.debug(
-                "[m3p] %s state update (topic=%s, payload=%s, state=%s)",
+                "[mmb] %s state update (topic=%s, payload=%s, state=%s)",
                 self._log_identity(),
                 msg.topic,
                 state_str,
@@ -431,7 +431,7 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
                 _LOGGER.error("Failed to subscribe to state topic: %s", state_topic)
                 raise RuntimeError(f"Failed to subscribe to state topic: {state_topic}")
             _LOGGER.debug(
-                "[m3p] %s subscribed to state topic=%s",
+                "[mmb] %s subscribed to state topic=%s",
                 self._log_identity(),
                 state_topic,
             )
@@ -471,7 +471,7 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
             self.async_write_ha_state()
             _LOGGER.debug("✅ Volume updated to: %s", self._attr_volume_level)
             _LOGGER.debug(
-                "[m3p] %s volume update (topic=%s, payload=%s, volume=%.3f)",
+                "[mmb] %s volume update (topic=%s, payload=%s, volume=%.3f)",
                 self._log_identity(),
                 msg.topic,
                 payload_str,
@@ -490,7 +490,7 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
                     f"Failed to subscribe to volume topic: {volume_topic}"
                 )
             _LOGGER.debug(
-                "[m3p] %s subscribed to volume topic=%s",
+                "[mmb] %s subscribed to volume topic=%s",
                 self._log_identity(),
                 volume_topic,
             )
@@ -506,7 +506,7 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
             self._attr_media_title = self._decode_payload(msg.payload)
             self.async_write_ha_state()
             _LOGGER.debug(
-                "[m3p] %s title update (topic=%s, title=%s)",
+                "[mmb] %s title update (topic=%s, title=%s)",
                 self._log_identity(),
                 msg.topic,
                 self._attr_media_title,
@@ -522,7 +522,7 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
                 _LOGGER.error("Failed to subscribe to title topic: %s", title_topic)
                 raise RuntimeError(f"Failed to subscribe to title topic: {title_topic}")
             _LOGGER.debug(
-                "[m3p] %s subscribed to title topic=%s",
+                "[mmb] %s subscribed to title topic=%s",
                 self._log_identity(),
                 title_topic,
             )
@@ -539,7 +539,7 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
             self.async_write_ha_state()
             _LOGGER.debug("✅ Media artist updated to: %s", self._attr_media_artist)
             _LOGGER.debug(
-                "[m3p] %s artist update (topic=%s, artist=%s)",
+                "[mmb] %s artist update (topic=%s, artist=%s)",
                 self._log_identity(),
                 msg.topic,
                 self._attr_media_artist,
@@ -557,7 +557,7 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
                     f"Failed to subscribe to artist topic: {artist_topic}"
                 )
             _LOGGER.debug(
-                "[m3p] %s subscribed to artist topic=%s",
+                "[mmb] %s subscribed to artist topic=%s",
                 self._log_identity(),
                 artist_topic,
             )
@@ -574,7 +574,7 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
             self.async_write_ha_state()
             _LOGGER.debug("✅ Media album updated to: %s", self._attr_media_album_name)
             _LOGGER.debug(
-                "[m3p] %s album update (topic=%s, album=%s)",
+                "[mmb] %s album update (topic=%s, album=%s)",
                 self._log_identity(),
                 msg.topic,
                 self._attr_media_album_name,
@@ -592,7 +592,7 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
                 _LOGGER.error("Failed to subscribe to album topic: %s", album_topic)
                 raise RuntimeError(f"Failed to subscribe to album topic: {album_topic}")
             _LOGGER.debug(
-                "[m3p] %s subscribed to album topic=%s",
+                "[mmb] %s subscribed to album topic=%s",
                 self._log_identity(),
                 album_topic,
             )
@@ -630,7 +630,7 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
             self.async_write_ha_state()
             _LOGGER.debug("✅ Media duration updated to: %s", self._attr_media_duration)
             _LOGGER.debug(
-                "[m3p] %s duration update (topic=%s, payload=%s, duration=%s)",
+                "[mmb] %s duration update (topic=%s, payload=%s, duration=%s)",
                 self._log_identity(),
                 msg.topic,
                 payload_str,
@@ -653,7 +653,7 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
                     f"Failed to subscribe to duration topic: {duration_topic}"
                 )
             _LOGGER.debug(
-                "[m3p] %s subscribed to duration topic=%s",
+                "[mmb] %s subscribed to duration topic=%s",
                 self._log_identity(),
                 duration_topic,
             )
@@ -694,7 +694,7 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
             self.async_write_ha_state()
             _LOGGER.debug("✅ Media position updated to: %s", self._attr_media_position)
             _LOGGER.debug(
-                "[m3p] %s position update (topic=%s, payload=%s, position=%s)",
+                "[mmb] %s position update (topic=%s, payload=%s, position=%s)",
                 self._log_identity(),
                 msg.topic,
                 payload_str,
@@ -717,7 +717,7 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
                     f"Failed to subscribe to position topic: {position_topic}"
                 )
             _LOGGER.debug(
-                "[m3p] %s subscribed to position topic=%s",
+                "[mmb] %s subscribed to position topic=%s",
                 self._log_identity(),
                 position_topic,
             )
@@ -751,7 +751,7 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
             url_for_log = self._truncate_url_for_logging(self._attr_media_image_url)
             _LOGGER.debug("✅ Media image URL updated to: %s", url_for_log)
             _LOGGER.debug(
-                "[m3p] %s image_url update (topic=%s, url=%s)",
+                "[mmb] %s image_url update (topic=%s, url=%s)",
                 self._log_identity(),
                 msg.topic,
                 url_for_log,
@@ -773,7 +773,7 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
                     f"Failed to subscribe to image URL topic: {image_url_topic}"
                 )
             _LOGGER.debug(
-                "[m3p] %s subscribed to image_url topic=%s",
+                "[mmb] %s subscribed to image_url topic=%s",
                 self._log_identity(),
                 image_url_topic,
             )
@@ -805,7 +805,7 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
                     self._attr_media_image_remotely_accessible,
                 )
                 _LOGGER.debug(
-                    "[m3p] %s image_accessible update (topic=%s, payload=%s, accessible=%s)",
+                    "[mmb] %s image_accessible update (topic=%s, payload=%s, accessible=%s)",
                     self._log_identity(),
                     msg.topic,
                     payload_str,
@@ -834,7 +834,7 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
                     f"Failed to subscribe to image accessible topic: {image_accessible_topic}"
                 )
             _LOGGER.debug(
-                "[m3p] %s subscribed to image_accessible topic=%s",
+                "[mmb] %s subscribed to image_accessible topic=%s",
                 self._log_identity(),
                 image_accessible_topic,
             )
@@ -862,7 +862,7 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
         async_subscribe_topics_internal(self.hass, self._sub_state)
         _LOGGER.debug("✅ MQTT subscription completed for entity: %s", self.entity_id)
         _LOGGER.debug(
-            "[m3p] %s MQTT topic subscription batch complete (subscriptions=%s)",
+            "[mmb] %s MQTT topic subscription batch complete (subscriptions=%s)",
             self._log_identity(),
             list(getattr(self, "_subscriptions", {}).keys()),
         )
@@ -874,7 +874,7 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
             _LOGGER.warning("Play command called but no play topic configured")
             return
         _LOGGER.debug("🎵 Sending PLAY command to topic: %s", topic)
-        _LOGGER.debug("[m3p] %s publish PLAY (topic=%s)", self._log_identity(), topic)
+        _LOGGER.debug("[mmb] %s publish PLAY (topic=%s)", self._log_identity(), topic)
         try:
             await self.async_publish(topic, "")
         except Exception as e:
@@ -887,7 +887,7 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
             _LOGGER.warning("Pause command called but no pause topic configured")
             return
         _LOGGER.debug("⏸️ Sending PAUSE command to topic: %s", topic)
-        _LOGGER.debug("[m3p] %s publish PAUSE (topic=%s)", self._log_identity(), topic)
+        _LOGGER.debug("[mmb] %s publish PAUSE (topic=%s)", self._log_identity(), topic)
         try:
             await self.async_publish(topic, "")
         except Exception as e:
@@ -900,7 +900,7 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
             _LOGGER.warning("Stop command called but no stop topic configured")
             return
         _LOGGER.debug("⏹️ Sending STOP command to topic: %s", topic)
-        _LOGGER.debug("[m3p] %s publish STOP (topic=%s)", self._log_identity(), topic)
+        _LOGGER.debug("[mmb] %s publish STOP (topic=%s)", self._log_identity(), topic)
         try:
             await self.async_publish(topic, "")
         except Exception as e:
@@ -915,7 +915,7 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
             )
             return
         _LOGGER.debug("⏭️ Sending NEXT TRACK command to topic: %s", topic)
-        _LOGGER.debug("[m3p] %s publish NEXT (topic=%s)", self._log_identity(), topic)
+        _LOGGER.debug("[mmb] %s publish NEXT (topic=%s)", self._log_identity(), topic)
         try:
             await self.async_publish(topic, "")
         except Exception as e:
@@ -933,7 +933,7 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
             return
         _LOGGER.debug("⏮️ Sending PREVIOUS TRACK command to topic: %s", topic)
         _LOGGER.debug(
-            "[m3p] %s publish PREVIOUS (topic=%s)", self._log_identity(), topic
+            "[mmb] %s publish PREVIOUS (topic=%s)", self._log_identity(), topic
         )
         try:
             await self.async_publish(topic, "")
@@ -957,7 +957,7 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
             payload,
         )
         _LOGGER.debug(
-            "[m3p] %s publish VOLUME_SET (topic=%s, payload=%s)",
+            "[mmb] %s publish VOLUME_SET (topic=%s, payload=%s)",
             self._log_identity(),
             topic,
             payload,
@@ -982,7 +982,7 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
             "🔇 Sending MUTE VOLUME command to topic: %s, payload: %s", topic, payload
         )
         _LOGGER.debug(
-            "[m3p] %s publish VOLUME_MUTE (topic=%s, payload=%s)",
+            "[mmb] %s publish VOLUME_MUTE (topic=%s, payload=%s)",
             self._log_identity(),
             topic,
             payload,
@@ -1005,7 +1005,7 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
             "⏩ Sending SEEK command to topic: %s, payload: %s", topic, payload
         )
         _LOGGER.debug(
-            "[m3p] %s publish SEEK (topic=%s, payload=%s)",
+            "[mmb] %s publish SEEK (topic=%s, payload=%s)",
             self._log_identity(),
             topic,
             payload,

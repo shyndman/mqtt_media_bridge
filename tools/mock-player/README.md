@@ -1,6 +1,6 @@
 # Mock Player
 
-A standalone CLI media player emulator for manual testing of the M3P Home Assistant integration. It publishes MQTT discovery and state updates using `ha-mqtt-discoverable`, listens for command topics, and continuously plays fake tracks with PNG artwork.
+A standalone CLI media player emulator for manual testing of the MQTT Media Bridge Home Assistant integration. It publishes MQTT discovery and state updates using `ha-mqtt-discoverable`, listens for command topics, and continuously plays fake tracks with PNG artwork.
 
 ## Quick start
 

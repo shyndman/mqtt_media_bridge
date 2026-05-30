@@ -1,5 +1,5 @@
-DOMAIN = "m3p"
-DEFAULT_NAME = "Mellow MQTT Media Device"
+DOMAIN = "mqtt_media_bridge"
+DEFAULT_NAME = "MQTT Media Bridge"
 
 # Define topics for the media player
 CONF_MEDIA_ALBUM_NAME_TOPIC = "media_album_name_topic"

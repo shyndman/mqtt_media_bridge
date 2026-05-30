@@ -1,7 +1,7 @@
 [project]
 name = "mock-player"
 version = "0.1.0"
-description = "Standalone mock media player for M3P manual testing"
+description = "Standalone mock media player for MQTT Media Bridge manual testing"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
