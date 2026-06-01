@@ -95,6 +95,7 @@ class MockPlayer:
 
         self._publish_track(self._current_track, reset_position=True)
         self._player.set_volume(self._volume)
+        self._player.set_muted(self._muted)
         self._player.set_state(self._state)
         self._player.set_availability(True)
 
@@ -286,6 +287,7 @@ class MockPlayer:
                 self._muted = False
                 self._volume = self._last_volume
             self._player.set_volume(self._volume)
+            self._player.set_muted(self._muted)
 
 
 def _generate_png_data_url(label: str, index: int) -> str:

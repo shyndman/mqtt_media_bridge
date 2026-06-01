@@ -53,7 +53,9 @@ The component supports the following MQTT topics for control and state:
 | `media_position_topic` | Current position (seconds) | `120` |
 | `media_image_url_topic` | Album art URL | `"http://example.com/art.jpg"` |
 | `volume_level_topic` | Volume level (0.0-1.0) | `0.75` |
-| `volume_mute_topic` | Mute state | `true` or `false` |
+| `volume_mute_state_topic` | Mute state | `true` or `false` |
+| `shuffle_state_topic` | Shuffle state | `true` or `false` |
+| `repeat_state_topic` | Repeat mode | `off`, `all`, or `one` |
 
 ### Command Topics (Publish)
 
@@ -65,7 +67,9 @@ The component supports the following MQTT topics for control and state:
 | `next_track_topic` | Skip to next track | Any payload |
 | `previous_track_topic` | Go to previous track | Any payload |
 | `volume_set_topic` | Set volume level | `0.0` to `1.0` |
-| `volume_mute_topic` | Toggle mute | `true` or `false` |
+| `volume_mute_command_topic` | Toggle mute | `true` or `false` |
+| `shuffle_set_topic` | Set shuffle mode | `true` or `false` |
+| `repeat_set_topic` | Set repeat mode | `off`, `all`, or `one` |
 | `seek_topic` | Seek to position | Position in seconds |
 
 ## Media Player Implementation

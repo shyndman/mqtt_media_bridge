@@ -15,6 +15,7 @@ from homeassistant.components.media_player.const import (
 from homeassistant.components.media_player.const import (
     MediaPlayerEntityFeature,
     MediaPlayerState,
+    RepeatMode,
 )
 from homeassistant.components.mqtt import (
     CONF_STATE_TOPIC,
@@ -48,10 +49,15 @@ from custom_components.mqtt_media_bridge.const import (
     CONF_PAUSE_TOPIC,
     CONF_PLAY_TOPIC,
     CONF_PREVIOUS_TRACK_TOPIC,
+    CONF_REPEAT_SET_TOPIC,
+    CONF_REPEAT_STATE_TOPIC,
     CONF_SEEK_TOPIC,
+    CONF_SHUFFLE_SET_TOPIC,
+    CONF_SHUFFLE_STATE_TOPIC,
     CONF_STOP_TOPIC,
     CONF_VOLUME_LEVEL_TOPIC,
-    CONF_VOLUME_MUTE_TOPIC,
+    CONF_VOLUME_MUTE_COMMAND_TOPIC,
+    CONF_VOLUME_MUTE_STATE_TOPIC,
     CONF_VOLUME_SET_TOPIC,
     CONF_VOLUME_STEP,
     DEFAULT_NAME,
@@ -74,15 +80,20 @@ PLATFORM_SCHEMA_MODERN = MQTT_RO_SCHEMA.extend(
         vol.Optional(CONF_MEDIA_POSITION_TOPIC): cv.string,
         vol.Optional(CONF_MEDIA_TITLE_TOPIC): cv.string,
         vol.Optional(CONF_STATE_TOPIC): cv.string,
+        vol.Optional(CONF_REPEAT_STATE_TOPIC): cv.string,
+        vol.Optional(CONF_SHUFFLE_STATE_TOPIC): cv.string,
         vol.Optional(CONF_VOLUME_LEVEL_TOPIC): cv.string,
+        vol.Optional(CONF_VOLUME_MUTE_STATE_TOPIC): cv.string,
         # Commands
         vol.Optional(CONF_NEXT_TRACK_TOPIC): cv.string,
         vol.Optional(CONF_PAUSE_TOPIC): cv.string,
         vol.Optional(CONF_PLAY_TOPIC): cv.string,
         vol.Optional(CONF_PREVIOUS_TRACK_TOPIC): cv.string,
+        vol.Optional(CONF_REPEAT_SET_TOPIC): cv.string,
         vol.Optional(CONF_SEEK_TOPIC): cv.string,
+        vol.Optional(CONF_SHUFFLE_SET_TOPIC): cv.string,
         vol.Optional(CONF_STOP_TOPIC): cv.string,
-        vol.Optional(CONF_VOLUME_MUTE_TOPIC): cv.string,
+        vol.Optional(CONF_VOLUME_MUTE_COMMAND_TOPIC): cv.string,
         vol.Optional(CONF_VOLUME_SET_TOPIC): cv.string,
         vol.Optional(CONF_VOLUME_STEP): vol.Coerce(float),
     }
@@ -250,9 +261,15 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
             features |= MediaPlayerEntityFeature.VOLUME_SET
             feature_topics.append("VOLUME_SET")
             feature_topics.append("VOLUME_STEP")
-        if self._config.get(CONF_VOLUME_MUTE_TOPIC):
+        if self._config.get(CONF_VOLUME_MUTE_COMMAND_TOPIC):
             features |= MediaPlayerEntityFeature.VOLUME_MUTE
             feature_topics.append("VOLUME_MUTE")
+        if self._config.get(CONF_SHUFFLE_SET_TOPIC):
+            features |= MediaPlayerEntityFeature.SHUFFLE_SET
+            feature_topics.append("SHUFFLE_SET")
+        if self._config.get(CONF_REPEAT_SET_TOPIC):
+            features |= MediaPlayerEntityFeature.REPEAT_SET
+            feature_topics.append("REPEAT_SET")
 
         # Check if features have changed
         if previous_features is not None and previous_features != features:
@@ -307,6 +324,12 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
             return payload.tobytes().decode("utf-8")
         return str(payload)
 
+    def _decode_bool_payload(self, payload: str | None) -> bool | None:
+        """Decode a string payload into a boolean state."""
+        if payload is None:
+            return None
+        return payload.lower() in ("true", "1", "yes", "on")
+
     def _is_data_uri_image(self, url: str | None) -> bool:
         """Check if URL is an image data URI."""
         if not url:
@@ -341,6 +364,9 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
         all_topic_configs = [
             (CONF_STATE_TOPIC, "state"),
             (CONF_VOLUME_LEVEL_TOPIC, "volume_level"),
+            (CONF_VOLUME_MUTE_STATE_TOPIC, "volume_mute_state"),
+            (CONF_SHUFFLE_STATE_TOPIC, "shuffle_state"),
+            (CONF_REPEAT_STATE_TOPIC, "repeat_state"),
             (CONF_MEDIA_TITLE_TOPIC, "media_title"),
             (CONF_MEDIA_ARTIST_TOPIC, "media_artist"),
             (CONF_MEDIA_ALBUM_NAME_TOPIC, "media_album"),
@@ -496,6 +522,163 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
             )
         else:
             _LOGGER.debug("❌ No volume topic configured, skipping volume subscription")
+
+        @callback
+        def volume_mute_received(msg: ReceiveMessage) -> None:
+            """Handle new MQTT mute state messages."""
+            _LOGGER.debug(
+                "🔇 MUTE MESSAGE RECEIVED on topic %s: %s", msg.topic, msg.payload
+            )
+
+            payload_str = self._decode_payload(msg.payload)
+            muted = self._decode_bool_payload(payload_str)
+            if muted is None:
+                _LOGGER.debug("Empty mute payload received, ignoring")
+                return
+
+            self._attr_is_volume_muted = muted
+            self.async_write_ha_state()
+            _LOGGER.debug("✅ Muted updated to: %s", self._attr_is_volume_muted)
+            _LOGGER.debug(
+                "[mmb] %s mute update (topic=%s, payload=%s, muted=%s)",
+                self._log_identity(),
+                msg.topic,
+                payload_str,
+                self._attr_is_volume_muted,
+            )
+
+        mute_state_topic = self._config.get(CONF_VOLUME_MUTE_STATE_TOPIC)
+        _LOGGER.debug("📡 SUBSCRIBING TO MUTE STATE TOPIC: %s", mute_state_topic)
+        if mute_state_topic:
+            success = self.add_subscription(
+                CONF_VOLUME_MUTE_STATE_TOPIC,
+                volume_mute_received,
+                {"_attr_is_volume_muted"},
+            )
+            if not success:
+                _LOGGER.error(
+                    "Failed to subscribe to mute state topic: %s", mute_state_topic
+                )
+                raise RuntimeError(
+                    f"Failed to subscribe to mute state topic: {mute_state_topic}"
+                )
+            _LOGGER.debug(
+                "[mmb] %s subscribed to mute_state topic=%s",
+                self._log_identity(),
+                mute_state_topic,
+            )
+        else:
+            _LOGGER.debug(
+                "❌ No mute state topic configured, skipping mute subscription"
+            )
+
+        @callback
+        def shuffle_state_received(msg: ReceiveMessage) -> None:
+            """Handle new MQTT shuffle state messages."""
+            _LOGGER.debug(
+                "🔀 SHUFFLE MESSAGE RECEIVED on topic %s: %s", msg.topic, msg.payload
+            )
+
+            payload_str = self._decode_payload(msg.payload)
+            shuffle = self._decode_bool_payload(payload_str)
+            if shuffle is None:
+                _LOGGER.debug("Empty shuffle payload received, ignoring")
+                return
+
+            self._attr_shuffle = shuffle
+            self.async_write_ha_state()
+            _LOGGER.debug("✅ Shuffle updated to: %s", self._attr_shuffle)
+            _LOGGER.debug(
+                "[mmb] %s shuffle update (topic=%s, payload=%s, shuffle=%s)",
+                self._log_identity(),
+                msg.topic,
+                payload_str,
+                self._attr_shuffle,
+            )
+
+        shuffle_state_topic = self._config.get(CONF_SHUFFLE_STATE_TOPIC)
+        _LOGGER.debug(
+            "📡 SUBSCRIBING TO SHUFFLE STATE TOPIC: %s", shuffle_state_topic
+        )
+        if shuffle_state_topic:
+            success = self.add_subscription(
+                CONF_SHUFFLE_STATE_TOPIC,
+                shuffle_state_received,
+                {"_attr_shuffle"},
+            )
+            if not success:
+                _LOGGER.error(
+                    "Failed to subscribe to shuffle state topic: %s",
+                    shuffle_state_topic,
+                )
+                raise RuntimeError(
+                    f"Failed to subscribe to shuffle state topic: {shuffle_state_topic}"
+                )
+            _LOGGER.debug(
+                "[mmb] %s subscribed to shuffle_state topic=%s",
+                self._log_identity(),
+                shuffle_state_topic,
+            )
+        else:
+            _LOGGER.debug(
+                "❌ No shuffle state topic configured, skipping shuffle subscription"
+            )
+
+        @callback
+        def repeat_state_received(msg: ReceiveMessage) -> None:
+            """Handle new MQTT repeat state messages."""
+            _LOGGER.debug(
+                "🔁 REPEAT MESSAGE RECEIVED on topic %s: %s", msg.topic, msg.payload
+            )
+
+            payload_str = self._decode_payload(msg.payload)
+            if payload_str is None:
+                _LOGGER.debug("Empty repeat payload received, ignoring")
+                return
+
+            try:
+                repeat = RepeatMode(payload_str.lower())
+            except ValueError:
+                _LOGGER.warning(
+                    "Invalid repeat mode received: %s. Ignoring.", payload_str
+                )
+                return
+
+            self._attr_repeat = repeat
+            self.async_write_ha_state()
+            _LOGGER.debug("✅ Repeat updated to: %s", self._attr_repeat)
+            _LOGGER.debug(
+                "[mmb] %s repeat update (topic=%s, payload=%s, repeat=%s)",
+                self._log_identity(),
+                msg.topic,
+                payload_str,
+                self._attr_repeat,
+            )
+
+        repeat_state_topic = self._config.get(CONF_REPEAT_STATE_TOPIC)
+        _LOGGER.debug("📡 SUBSCRIBING TO REPEAT STATE TOPIC: %s", repeat_state_topic)
+        if repeat_state_topic:
+            success = self.add_subscription(
+                CONF_REPEAT_STATE_TOPIC,
+                repeat_state_received,
+                {"_attr_repeat"},
+            )
+            if not success:
+                _LOGGER.error(
+                    "Failed to subscribe to repeat state topic: %s", repeat_state_topic
+                )
+                raise RuntimeError(
+                    f"Failed to subscribe to repeat state topic: {repeat_state_topic}"
+                )
+            _LOGGER.debug(
+                "[mmb] %s subscribed to repeat_state topic=%s",
+                self._log_identity(),
+                repeat_state_topic,
+            )
+        else:
+            _LOGGER.debug(
+                "❌ No repeat state topic configured, skipping repeat subscription"
+            )
 
         @callback
         def media_title_received(msg: ReceiveMessage) -> None:
@@ -971,10 +1154,10 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
 
     async def async_mute_volume(self, mute: bool) -> None:
         """Send a mute volume command to the media player."""
-        topic = self._config.get(CONF_VOLUME_MUTE_TOPIC)
+        topic = self._config.get(CONF_VOLUME_MUTE_COMMAND_TOPIC)
         if not topic:
             _LOGGER.warning(
-                "Mute volume command called but no volume mute topic configured"
+                "Mute volume command called but no volume mute command topic configured"
             )
             return
         payload = "true" if mute else "false"
@@ -992,6 +1175,52 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
         except Exception as e:
             _LOGGER.error(
                 "Failed to publish mute volume command to topic %s: %s", topic, e
+            )
+
+    async def async_set_shuffle(self, shuffle: bool) -> None:
+        """Send a shuffle command to the media player."""
+        topic = self._config.get(CONF_SHUFFLE_SET_TOPIC)
+        if not topic:
+            _LOGGER.warning("Shuffle command called but no shuffle set topic configured")
+            return
+        payload = "true" if shuffle else "false"
+        _LOGGER.debug(
+            "🔀 Sending SHUFFLE command to topic: %s, payload: %s", topic, payload
+        )
+        _LOGGER.debug(
+            "[mmb] %s publish SHUFFLE_SET (topic=%s, payload=%s)",
+            self._log_identity(),
+            topic,
+            payload,
+        )
+        try:
+            await self.async_publish(topic, payload)
+        except Exception as e:
+            _LOGGER.error(
+                "Failed to publish shuffle command to topic %s: %s", topic, e
+            )
+
+    async def async_set_repeat(self, repeat: RepeatMode) -> None:
+        """Send a repeat command to the media player."""
+        topic = self._config.get(CONF_REPEAT_SET_TOPIC)
+        if not topic:
+            _LOGGER.warning("Repeat command called but no repeat set topic configured")
+            return
+        payload = repeat.value
+        _LOGGER.debug(
+            "🔁 Sending REPEAT command to topic: %s, payload: %s", topic, payload
+        )
+        _LOGGER.debug(
+            "[mmb] %s publish REPEAT_SET (topic=%s, payload=%s)",
+            self._log_identity(),
+            topic,
+            payload,
+        )
+        try:
+            await self.async_publish(topic, payload)
+        except Exception as e:
+            _LOGGER.error(
+                "Failed to publish repeat command to topic %s: %s", topic, e
             )
 
     async def async_media_seek(self, position: float) -> None:
