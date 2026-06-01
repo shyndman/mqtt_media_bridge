@@ -62,15 +62,22 @@ The component supports the following MQTT topics for control and state:
 | Topic | Description | Payload |
 |-------|-------------|---------|
 | `play_topic` | Start playback | Any payload |
+| `turn_on_topic` | Power on the player | Any payload |
+| `turn_off_topic` | Power off the player | Any payload |
 | `pause_topic` | Pause playback | Any payload |
 | `stop_topic` | Stop playback | Any payload |
 | `next_track_topic` | Skip to next track | Any payload |
 | `previous_track_topic` | Go to previous track | Any payload |
+| `play_media_topic` | Play a specific media item | JSON with `media_type`, `media_id`, and optional `enqueue` / `announce` |
+| `select_source_topic` | Select an input source | Source name |
+| `select_sound_mode_topic` | Select a sound mode | Sound mode name |
 | `volume_set_topic` | Set volume level | `0.0` to `1.0` |
 | `volume_mute_command_topic` | Toggle mute | `true` or `false` |
 | `shuffle_set_topic` | Set shuffle mode | `true` or `false` |
 | `repeat_set_topic` | Set repeat mode | `off`, `all`, or `one` |
 | `seek_topic` | Seek to position | Position in seconds |
+
+`source_list` and `sound_mode_list` discovery fields populate the selectable options Home Assistant exposes for source and sound-mode commands.
 
 ## Media Player Implementation
 

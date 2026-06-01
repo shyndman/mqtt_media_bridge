@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import importlib.util
+import json
 import sys
 from dataclasses import dataclass
 from enum import IntFlag, StrEnum
@@ -24,10 +25,17 @@ class MediaPlayerEntityFeature(IntFlag):
     VOLUME_MUTE = 8
     PREVIOUS_TRACK = 16
     NEXT_TRACK = 32
-    PLAY = 64
-    STOP = 128
-    SHUFFLE_SET = 256
-    REPEAT_SET = 512
+    TURN_ON = 128
+    TURN_OFF = 256
+    PLAY_MEDIA = 512
+    VOLUME_STEP = 1024
+    SELECT_SOURCE = 2048
+    STOP = 4096
+    PLAY = 16384
+    SHUFFLE_SET = 32768
+    SELECT_SOUND_MODE = 65536
+    BROWSE_MEDIA = 131072
+    REPEAT_SET = 262144
 
 
 class MediaPlayerState(StrEnum):
@@ -166,7 +174,7 @@ MEDIA_PLAYER_MODULE = _load_module("bridge_media_player_module", MEDIA_PLAYER_PA
 MqttMediaPlayer = MEDIA_PLAYER_MODULE.MqttMediaPlayer
 
 
-def _make_player(config: dict[str, str]) -> tuple[MqttMediaPlayer, dict[str, Any], list[str]]:
+def _make_player(config: dict[str, Any]) -> tuple[MqttMediaPlayer, dict[str, Any], list[str]]:
     player = object.__new__(MqttMediaPlayer)
     player._config = config
     player._mmb_entry_id = "entry-id"
@@ -188,37 +196,94 @@ def test_config_schema_accepts_split_state_and_command_topics() -> None:
 
     config = schema(
         {
+            CONST_MODULE.CONF_SOURCE_LIST: ["TV", "Bluetooth"],
             CONST_MODULE.CONF_VOLUME_MUTE_STATE_TOPIC: "bridge/player/volume_mute_state",
             CONST_MODULE.CONF_VOLUME_MUTE_COMMAND_TOPIC: "bridge/player/volume_mute",
             CONST_MODULE.CONF_SHUFFLE_STATE_TOPIC: "bridge/player/shuffle_state",
             CONST_MODULE.CONF_SHUFFLE_SET_TOPIC: "bridge/player/shuffle_set",
             CONST_MODULE.CONF_REPEAT_STATE_TOPIC: "bridge/player/repeat_state",
             CONST_MODULE.CONF_REPEAT_SET_TOPIC: "bridge/player/repeat_set",
+            CONST_MODULE.CONF_SOUND_MODE_LIST: ["Movie", "Music"],
+            CONST_MODULE.CONF_SELECT_SOURCE_TOPIC: "bridge/player/select_source",
+            CONST_MODULE.CONF_SELECT_SOUND_MODE_TOPIC: "bridge/player/select_sound_mode",
+            CONST_MODULE.CONF_TURN_ON_TOPIC: "bridge/player/turn_on",
+            CONST_MODULE.CONF_TURN_OFF_TOPIC: "bridge/player/turn_off",
+            CONST_MODULE.CONF_PLAY_MEDIA_TOPIC: "bridge/player/play_media",
         }
     )
 
+    assert config[CONST_MODULE.CONF_SOURCE_LIST] == ["TV", "Bluetooth"]
     assert config[CONST_MODULE.CONF_VOLUME_MUTE_STATE_TOPIC].endswith("volume_mute_state")
     assert config[CONST_MODULE.CONF_VOLUME_MUTE_COMMAND_TOPIC].endswith("volume_mute")
     assert config[CONST_MODULE.CONF_SHUFFLE_STATE_TOPIC].endswith("shuffle_state")
     assert config[CONST_MODULE.CONF_SHUFFLE_SET_TOPIC].endswith("shuffle_set")
     assert config[CONST_MODULE.CONF_REPEAT_STATE_TOPIC].endswith("repeat_state")
     assert config[CONST_MODULE.CONF_REPEAT_SET_TOPIC].endswith("repeat_set")
+    assert config[CONST_MODULE.CONF_SOUND_MODE_LIST] == ["Movie", "Music"]
+    assert config[CONST_MODULE.CONF_SELECT_SOURCE_TOPIC].endswith("select_source")
+    assert config[CONST_MODULE.CONF_SELECT_SOUND_MODE_TOPIC].endswith("select_sound_mode")
+    assert config[CONST_MODULE.CONF_TURN_ON_TOPIC].endswith("turn_on")
+    assert config[CONST_MODULE.CONF_TURN_OFF_TOPIC].endswith("turn_off")
+    assert config[CONST_MODULE.CONF_PLAY_MEDIA_TOPIC].endswith("play_media")
 
 
 def test_setup_from_config_enables_split_features() -> None:
     player, _subscriptions, _writes = _make_player(
         {
+            CONST_MODULE.CONF_SOURCE_LIST: ["TV", "Bluetooth"],
             CONST_MODULE.CONF_VOLUME_MUTE_COMMAND_TOPIC: "bridge/player/volume_mute",
             CONST_MODULE.CONF_SHUFFLE_SET_TOPIC: "bridge/player/shuffle_set",
             CONST_MODULE.CONF_REPEAT_SET_TOPIC: "bridge/player/repeat_set",
+            CONST_MODULE.CONF_SOUND_MODE_LIST: ["Movie", "Music"],
+            CONST_MODULE.CONF_SELECT_SOURCE_TOPIC: "bridge/player/select_source",
+            CONST_MODULE.CONF_SELECT_SOUND_MODE_TOPIC: "bridge/player/select_sound_mode",
+            CONST_MODULE.CONF_TURN_ON_TOPIC: "bridge/player/turn_on",
+            CONST_MODULE.CONF_TURN_OFF_TOPIC: "bridge/player/turn_off",
+            CONST_MODULE.CONF_PLAY_MEDIA_TOPIC: "bridge/player/play_media",
         }
     )
 
     player._setup_from_config(player._config)
 
+    assert player._attr_source_list == ["TV", "Bluetooth"]
+    assert player._attr_sound_mode_list == ["Movie", "Music"]
+    assert player._attr_supported_features & MediaPlayerEntityFeature.SELECT_SOURCE
+    assert player._attr_supported_features & MediaPlayerEntityFeature.SELECT_SOUND_MODE
+    assert player._attr_supported_features & MediaPlayerEntityFeature.TURN_ON
+    assert player._attr_supported_features & MediaPlayerEntityFeature.TURN_OFF
+    assert player._attr_supported_features & MediaPlayerEntityFeature.PLAY_MEDIA
     assert player._attr_supported_features & MediaPlayerEntityFeature.VOLUME_MUTE
     assert player._attr_supported_features & MediaPlayerEntityFeature.SHUFFLE_SET
     assert player._attr_supported_features & MediaPlayerEntityFeature.REPEAT_SET
+
+
+def test_setup_from_config_enables_volume_step_only_with_step_value() -> None:
+    player, _subscriptions, _writes = _make_player(
+        {
+            CONST_MODULE.CONF_VOLUME_SET_TOPIC: "bridge/player/volume_set",
+            CONST_MODULE.CONF_VOLUME_STEP: 0.1,
+        }
+    )
+
+    player._setup_from_config(player._config)
+
+    assert player._attr_supported_features & MediaPlayerEntityFeature.VOLUME_SET
+    assert player._attr_supported_features & MediaPlayerEntityFeature.VOLUME_STEP
+    assert player._attr_volume_step == 0.1
+
+
+def test_setup_from_config_does_not_enable_volume_step_without_step_value() -> None:
+    player, _subscriptions, _writes = _make_player(
+        {
+            CONST_MODULE.CONF_VOLUME_SET_TOPIC: "bridge/player/volume_set",
+        }
+    )
+
+    player._setup_from_config(player._config)
+
+    assert player._attr_supported_features & MediaPlayerEntityFeature.VOLUME_SET
+    assert not player._attr_supported_features & MediaPlayerEntityFeature.VOLUME_STEP
+    assert not hasattr(player, "_attr_volume_step")
 
 
 def test_prepare_subscribe_topics_tracks_mute_shuffle_and_repeat_state() -> None:
@@ -267,6 +332,11 @@ def test_prepare_subscribe_topics_ignores_invalid_repeat_mode() -> None:
 def test_split_command_methods_publish_exact_topics_and_payloads() -> None:
     player, _subscriptions, _writes = _make_player(
         {
+            CONST_MODULE.CONF_PLAY_MEDIA_TOPIC: "bridge/player/play_media",
+            CONST_MODULE.CONF_SELECT_SOURCE_TOPIC: "bridge/player/select_source",
+            CONST_MODULE.CONF_SELECT_SOUND_MODE_TOPIC: "bridge/player/select_sound_mode",
+            CONST_MODULE.CONF_TURN_ON_TOPIC: "bridge/player/turn_on",
+            CONST_MODULE.CONF_TURN_OFF_TOPIC: "bridge/player/turn_off",
             CONST_MODULE.CONF_VOLUME_MUTE_COMMAND_TOPIC: "bridge/player/volume_mute",
             CONST_MODULE.CONF_SHUFFLE_SET_TOPIC: "bridge/player/shuffle_set",
             CONST_MODULE.CONF_REPEAT_SET_TOPIC: "bridge/player/repeat_set",
@@ -279,12 +349,37 @@ def test_split_command_methods_publish_exact_topics_and_payloads() -> None:
 
     player.async_publish = async_publish
 
+    asyncio.run(player.async_turn_on())
+    asyncio.run(player.async_turn_off())
     asyncio.run(player.async_mute_volume(True))
+    asyncio.run(
+        player.async_play_media(
+            "music",
+            "track-123",
+            enqueue="replace",
+            announce=True,
+        )
+    )
+    asyncio.run(player.async_select_source("Bluetooth"))
+    asyncio.run(player.async_select_sound_mode("Movie"))
     asyncio.run(player.async_set_shuffle(False))
     asyncio.run(player.async_set_repeat(RepeatMode.ONE))
 
+    play_media_payload = json.loads(publish_calls[3][1])
+
     assert publish_calls == [
+        ("bridge/player/turn_on", ""),
+        ("bridge/player/turn_off", ""),
         ("bridge/player/volume_mute", "true"),
+        ("bridge/player/play_media", publish_calls[3][1]),
+        ("bridge/player/select_source", "Bluetooth"),
+        ("bridge/player/select_sound_mode", "Movie"),
         ("bridge/player/shuffle_set", "false"),
         ("bridge/player/repeat_set", "one"),
     ]
+    assert play_media_payload == {
+        "media_type": "music",
+        "media_id": "track-123",
+        "enqueue": "replace",
+        "announce": True,
+    }

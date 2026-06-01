@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import re
+from typing import Any
+
 import voluptuous as vol
 from homeassistant.components import media_player, mqtt
 from homeassistant.components.media_player import (
@@ -44,6 +47,11 @@ from custom_components.mqtt_media_bridge.const import (
     CONF_MEDIA_IMAGE_REMOTELY_ACCESSIBLE_TOPIC,
     CONF_MEDIA_IMAGE_URL_TOPIC,
     CONF_MEDIA_POSITION_TOPIC,
+    CONF_PLAY_MEDIA_TOPIC,
+    CONF_SELECT_SOUND_MODE_TOPIC,
+    CONF_SELECT_SOURCE_TOPIC,
+    CONF_SOUND_MODE_LIST,
+    CONF_SOURCE_LIST,
     CONF_MEDIA_TITLE_TOPIC,
     CONF_NEXT_TRACK_TOPIC,
     CONF_PAUSE_TOPIC,
@@ -55,6 +63,8 @@ from custom_components.mqtt_media_bridge.const import (
     CONF_SHUFFLE_SET_TOPIC,
     CONF_SHUFFLE_STATE_TOPIC,
     CONF_STOP_TOPIC,
+    CONF_TURN_OFF_TOPIC,
+    CONF_TURN_ON_TOPIC,
     CONF_VOLUME_LEVEL_TOPIC,
     CONF_VOLUME_MUTE_COMMAND_TOPIC,
     CONF_VOLUME_MUTE_STATE_TOPIC,
@@ -78,21 +88,28 @@ PLATFORM_SCHEMA_MODERN = MQTT_RO_SCHEMA.extend(
         vol.Optional(CONF_MEDIA_IMAGE_REMOTELY_ACCESSIBLE_TOPIC): cv.string,
         vol.Optional(CONF_MEDIA_IMAGE_URL_TOPIC): cv.string,
         vol.Optional(CONF_MEDIA_POSITION_TOPIC): cv.string,
+        vol.Optional(CONF_SOURCE_LIST): [cv.string],
         vol.Optional(CONF_MEDIA_TITLE_TOPIC): cv.string,
         vol.Optional(CONF_STATE_TOPIC): cv.string,
         vol.Optional(CONF_REPEAT_STATE_TOPIC): cv.string,
         vol.Optional(CONF_SHUFFLE_STATE_TOPIC): cv.string,
+        vol.Optional(CONF_SOUND_MODE_LIST): [cv.string],
         vol.Optional(CONF_VOLUME_LEVEL_TOPIC): cv.string,
         vol.Optional(CONF_VOLUME_MUTE_STATE_TOPIC): cv.string,
         # Commands
         vol.Optional(CONF_NEXT_TRACK_TOPIC): cv.string,
         vol.Optional(CONF_PAUSE_TOPIC): cv.string,
         vol.Optional(CONF_PLAY_TOPIC): cv.string,
+        vol.Optional(CONF_PLAY_MEDIA_TOPIC): cv.string,
         vol.Optional(CONF_PREVIOUS_TRACK_TOPIC): cv.string,
         vol.Optional(CONF_REPEAT_SET_TOPIC): cv.string,
         vol.Optional(CONF_SEEK_TOPIC): cv.string,
+        vol.Optional(CONF_SELECT_SOUND_MODE_TOPIC): cv.string,
+        vol.Optional(CONF_SELECT_SOURCE_TOPIC): cv.string,
         vol.Optional(CONF_SHUFFLE_SET_TOPIC): cv.string,
         vol.Optional(CONF_STOP_TOPIC): cv.string,
+        vol.Optional(CONF_TURN_OFF_TOPIC): cv.string,
+        vol.Optional(CONF_TURN_ON_TOPIC): cv.string,
         vol.Optional(CONF_VOLUME_MUTE_COMMAND_TOPIC): cv.string,
         vol.Optional(CONF_VOLUME_SET_TOPIC): cv.string,
         vol.Optional(CONF_VOLUME_STEP): vol.Coerce(float),
@@ -239,6 +256,24 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
         features = MediaPlayerEntityFeature(0)
         feature_topics = []
 
+        source_list = self._config.get(CONF_SOURCE_LIST)
+        if source_list is not None:
+            self._attr_source_list = source_list
+        elif hasattr(self, "_attr_source_list"):
+            delattr(self, "_attr_source_list")
+
+        sound_mode_list = self._config.get(CONF_SOUND_MODE_LIST)
+        if sound_mode_list is not None:
+            self._attr_sound_mode_list = sound_mode_list
+        elif hasattr(self, "_attr_sound_mode_list"):
+            delattr(self, "_attr_sound_mode_list")
+
+        volume_step = self._config.get(CONF_VOLUME_STEP)
+        if volume_step is not None:
+            self._attr_volume_step = volume_step
+        elif hasattr(self, "_attr_volume_step"):
+            delattr(self, "_attr_volume_step")
+
         if self._config.get(CONF_PLAY_TOPIC):
             features |= MediaPlayerEntityFeature.PLAY
             feature_topics.append("PLAY")
@@ -254,13 +289,30 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
         if self._config.get(CONF_NEXT_TRACK_TOPIC):
             features |= MediaPlayerEntityFeature.NEXT_TRACK
             feature_topics.append("NEXT_TRACK")
+        if self._config.get(CONF_TURN_ON_TOPIC):
+            features |= MediaPlayerEntityFeature.TURN_ON
+            feature_topics.append("TURN_ON")
+        if self._config.get(CONF_TURN_OFF_TOPIC):
+            features |= MediaPlayerEntityFeature.TURN_OFF
+            feature_topics.append("TURN_OFF")
+        if self._config.get(CONF_PLAY_MEDIA_TOPIC):
+            features |= MediaPlayerEntityFeature.PLAY_MEDIA
+            feature_topics.append("PLAY_MEDIA")
         if self._config.get(CONF_SEEK_TOPIC):
             features |= MediaPlayerEntityFeature.SEEK
             feature_topics.append("SEEK")
+        if self._config.get(CONF_SELECT_SOURCE_TOPIC):
+            features |= MediaPlayerEntityFeature.SELECT_SOURCE
+            feature_topics.append("SELECT_SOURCE")
+        if self._config.get(CONF_SELECT_SOUND_MODE_TOPIC):
+            features |= MediaPlayerEntityFeature.SELECT_SOUND_MODE
+            feature_topics.append("SELECT_SOUND_MODE")
         if self._config.get(CONF_VOLUME_SET_TOPIC):
             features |= MediaPlayerEntityFeature.VOLUME_SET
             feature_topics.append("VOLUME_SET")
-            feature_topics.append("VOLUME_STEP")
+            if volume_step is not None:
+                features |= MediaPlayerEntityFeature.VOLUME_STEP
+                feature_topics.append("VOLUME_STEP")
         if self._config.get(CONF_VOLUME_MUTE_COMMAND_TOPIC):
             features |= MediaPlayerEntityFeature.VOLUME_MUTE
             feature_topics.append("VOLUME_MUTE")
@@ -1125,6 +1177,40 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
                 "Failed to publish previous track command to topic %s: %s", topic, e
             )
 
+    async def async_turn_on(self) -> None:
+        """Send a turn on command to the media player."""
+        topic = self._config.get(CONF_TURN_ON_TOPIC)
+        if not topic:
+            _LOGGER.warning("Turn on command called but no turn on topic configured")
+            return
+        _LOGGER.debug("🔌 Sending TURN ON command to topic: %s", topic)
+        _LOGGER.debug(
+            "[mmb] %s publish TURN_ON (topic=%s)", self._log_identity(), topic
+        )
+        try:
+            await self.async_publish(topic, "")
+        except Exception as e:
+            _LOGGER.error(
+                "Failed to publish turn on command to topic %s: %s", topic, e
+            )
+
+    async def async_turn_off(self) -> None:
+        """Send a turn off command to the media player."""
+        topic = self._config.get(CONF_TURN_OFF_TOPIC)
+        if not topic:
+            _LOGGER.warning("Turn off command called but no turn off topic configured")
+            return
+        _LOGGER.debug("🔌 Sending TURN OFF command to topic: %s", topic)
+        _LOGGER.debug(
+            "[mmb] %s publish TURN_OFF (topic=%s)", self._log_identity(), topic
+        )
+        try:
+            await self.async_publish(topic, "")
+        except Exception as e:
+            _LOGGER.error(
+                "Failed to publish turn off command to topic %s: %s", topic, e
+            )
+
     async def async_set_volume_level(self, volume: float) -> None:
         """Send a set volume level command to the media player."""
         topic = self._config.get(CONF_VOLUME_SET_TOPIC)
@@ -1175,6 +1261,97 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
         except Exception as e:
             _LOGGER.error(
                 "Failed to publish mute volume command to topic %s: %s", topic, e
+            )
+
+    async def async_play_media(
+        self, media_type: str, media_id: str, **kwargs: Any
+    ) -> None:
+        """Send a play media command to the media player."""
+        topic = self._config.get(CONF_PLAY_MEDIA_TOPIC)
+        if not topic:
+            _LOGGER.warning("Play media command called but no play media topic configured")
+            return
+
+        payload_data: dict[str, str | bool] = {
+            "media_type": media_type,
+            "media_id": media_id,
+        }
+        enqueue = kwargs.get("enqueue")
+        if enqueue is not None:
+            payload_data["enqueue"] = getattr(enqueue, "value", str(enqueue))
+        announce = kwargs.get("announce")
+        if announce is not None:
+            payload_data["announce"] = bool(announce)
+        payload = json.dumps(payload_data)
+
+        _LOGGER.debug(
+            "🎬 Sending PLAY MEDIA command to topic: %s, payload: %s", topic, payload
+        )
+        _LOGGER.debug(
+            "[mmb] %s publish PLAY_MEDIA (topic=%s, payload=%s)",
+            self._log_identity(),
+            topic,
+            payload,
+        )
+        try:
+            await self.async_publish(topic, payload)
+        except Exception as e:
+            _LOGGER.error(
+                "Failed to publish play media command to topic %s: %s", topic, e
+            )
+
+    async def async_select_source(self, source: str) -> None:
+        """Send a select source command to the media player."""
+        topic = self._config.get(CONF_SELECT_SOURCE_TOPIC)
+        if not topic:
+            _LOGGER.warning(
+                "Select source command called but no select source topic configured"
+            )
+            return
+        _LOGGER.debug(
+            "📻 Sending SELECT SOURCE command to topic: %s, payload: %s",
+            topic,
+            source,
+        )
+        _LOGGER.debug(
+            "[mmb] %s publish SELECT_SOURCE (topic=%s, payload=%s)",
+            self._log_identity(),
+            topic,
+            source,
+        )
+        try:
+            await self.async_publish(topic, source)
+        except Exception as e:
+            _LOGGER.error(
+                "Failed to publish select source command to topic %s: %s", topic, e
+            )
+
+    async def async_select_sound_mode(self, sound_mode: str) -> None:
+        """Send a select sound mode command to the media player."""
+        topic = self._config.get(CONF_SELECT_SOUND_MODE_TOPIC)
+        if not topic:
+            _LOGGER.warning(
+                "Select sound mode command called but no select sound mode topic configured"
+            )
+            return
+        _LOGGER.debug(
+            "🎚️ Sending SELECT SOUND MODE command to topic: %s, payload: %s",
+            topic,
+            sound_mode,
+        )
+        _LOGGER.debug(
+            "[mmb] %s publish SELECT_SOUND_MODE (topic=%s, payload=%s)",
+            self._log_identity(),
+            topic,
+            sound_mode,
+        )
+        try:
+            await self.async_publish(topic, sound_mode)
+        except Exception as e:
+            _LOGGER.error(
+                "Failed to publish select sound mode command to topic %s: %s",
+                topic,
+                e,
             )
 
     async def async_set_shuffle(self, shuffle: bool) -> None:
