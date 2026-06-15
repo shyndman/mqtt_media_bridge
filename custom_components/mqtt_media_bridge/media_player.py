@@ -1111,7 +1111,7 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
         _LOGGER.debug("🎵 Sending PLAY command to topic: %s", topic)
         _LOGGER.debug("[mmb] %s publish PLAY (topic=%s)", self._log_identity(), topic)
         try:
-            await self.async_publish(topic, "")
+            await mqtt.async_publish(self.hass, topic, "")
         except Exception as e:
             _LOGGER.error("Failed to publish play command to topic %s: %s", topic, e)
 
@@ -1124,7 +1124,7 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
         _LOGGER.debug("⏸️ Sending PAUSE command to topic: %s", topic)
         _LOGGER.debug("[mmb] %s publish PAUSE (topic=%s)", self._log_identity(), topic)
         try:
-            await self.async_publish(topic, "")
+            await mqtt.async_publish(self.hass, topic, "")
         except Exception as e:
             _LOGGER.error("Failed to publish pause command to topic %s: %s", topic, e)
 
@@ -1137,7 +1137,7 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
         _LOGGER.debug("⏹️ Sending STOP command to topic: %s", topic)
         _LOGGER.debug("[mmb] %s publish STOP (topic=%s)", self._log_identity(), topic)
         try:
-            await self.async_publish(topic, "")
+            await mqtt.async_publish(self.hass, topic, "")
         except Exception as e:
             _LOGGER.error("Failed to publish stop command to topic %s: %s", topic, e)
 
@@ -1152,7 +1152,7 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
         _LOGGER.debug("⏭️ Sending NEXT TRACK command to topic: %s", topic)
         _LOGGER.debug("[mmb] %s publish NEXT (topic=%s)", self._log_identity(), topic)
         try:
-            await self.async_publish(topic, "")
+            await mqtt.async_publish(self.hass, topic, "")
         except Exception as e:
             _LOGGER.error(
                 "Failed to publish next track command to topic %s: %s", topic, e
@@ -1171,7 +1171,7 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
             "[mmb] %s publish PREVIOUS (topic=%s)", self._log_identity(), topic
         )
         try:
-            await self.async_publish(topic, "")
+            await mqtt.async_publish(self.hass, topic, "")
         except Exception as e:
             _LOGGER.error(
                 "Failed to publish previous track command to topic %s: %s", topic, e
@@ -1188,7 +1188,7 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
             "[mmb] %s publish TURN_ON (topic=%s)", self._log_identity(), topic
         )
         try:
-            await self.async_publish(topic, "")
+            await mqtt.async_publish(self.hass, topic, "")
         except Exception as e:
             _LOGGER.error(
                 "Failed to publish turn on command to topic %s: %s", topic, e
@@ -1205,7 +1205,7 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
             "[mmb] %s publish TURN_OFF (topic=%s)", self._log_identity(), topic
         )
         try:
-            await self.async_publish(topic, "")
+            await mqtt.async_publish(self.hass, topic, "")
         except Exception as e:
             _LOGGER.error(
                 "Failed to publish turn off command to topic %s: %s", topic, e
@@ -1232,7 +1232,7 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
             payload,
         )
         try:
-            await self.async_publish(topic, payload)
+            await mqtt.async_publish(self.hass, topic, payload)
         except Exception as e:
             _LOGGER.error(
                 "Failed to publish volume level command to topic %s: %s", topic, e
@@ -1257,7 +1257,7 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
             payload,
         )
         try:
-            await self.async_publish(topic, payload)
+            await mqtt.async_publish(self.hass, topic, payload)
         except Exception as e:
             _LOGGER.error(
                 "Failed to publish mute volume command to topic %s: %s", topic, e
@@ -1294,7 +1294,7 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
             payload,
         )
         try:
-            await self.async_publish(topic, payload)
+            await mqtt.async_publish(self.hass, topic, payload)
         except Exception as e:
             _LOGGER.error(
                 "Failed to publish play media command to topic %s: %s", topic, e
@@ -1320,7 +1320,7 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
             source,
         )
         try:
-            await self.async_publish(topic, source)
+            await mqtt.async_publish(self.hass, topic, source)
         except Exception as e:
             _LOGGER.error(
                 "Failed to publish select source command to topic %s: %s", topic, e
@@ -1346,7 +1346,7 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
             sound_mode,
         )
         try:
-            await self.async_publish(topic, sound_mode)
+            await mqtt.async_publish(self.hass, topic, sound_mode)
         except Exception as e:
             _LOGGER.error(
                 "Failed to publish select sound mode command to topic %s: %s",
@@ -1371,7 +1371,7 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
             payload,
         )
         try:
-            await self.async_publish(topic, payload)
+            await mqtt.async_publish(self.hass, topic, payload)
         except Exception as e:
             _LOGGER.error(
                 "Failed to publish shuffle command to topic %s: %s", topic, e
@@ -1394,7 +1394,7 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
             payload,
         )
         try:
-            await self.async_publish(topic, payload)
+            await mqtt.async_publish(self.hass, topic, payload)
         except Exception as e:
             _LOGGER.error(
                 "Failed to publish repeat command to topic %s: %s", topic, e
@@ -1417,6 +1417,6 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
             payload,
         )
         try:
-            await self.async_publish(topic, payload)
+            await mqtt.async_publish(self.hass, topic, payload)
         except Exception as e:
             _LOGGER.error("Failed to publish seek command to topic %s: %s", topic, e)
