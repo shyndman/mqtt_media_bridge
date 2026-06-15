@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import importlib.util
 import json
+import logging
 import sys
 from dataclasses import dataclass
 from enum import IntFlag, StrEnum
@@ -174,11 +175,14 @@ MEDIA_PLAYER_MODULE = _load_module("bridge_media_player_module", MEDIA_PLAYER_PA
 MqttMediaPlayer = MEDIA_PLAYER_MODULE.MqttMediaPlayer
 
 
-def _make_player(config: dict[str, Any]) -> tuple[MqttMediaPlayer, dict[str, Any], list[str]]:
+def _make_player(
+    config: dict[str, Any],
+) -> tuple[MqttMediaPlayer, dict[str, Any], list[str]]:
     player = object.__new__(MqttMediaPlayer)
     player._config = config
     player._mmb_entry_id = "entry-id"
     player.entity_id = "media_player.test"
+    player.hass = object()
     subscriptions: dict[str, Any] = {}
     writes: list[str] = []
 
@@ -213,7 +217,9 @@ def test_config_schema_accepts_split_state_and_command_topics() -> None:
     )
 
     assert config[CONST_MODULE.CONF_SOURCE_LIST] == ["TV", "Bluetooth"]
-    assert config[CONST_MODULE.CONF_VOLUME_MUTE_STATE_TOPIC].endswith("volume_mute_state")
+    assert config[CONST_MODULE.CONF_VOLUME_MUTE_STATE_TOPIC].endswith(
+        "volume_mute_state"
+    )
     assert config[CONST_MODULE.CONF_VOLUME_MUTE_COMMAND_TOPIC].endswith("volume_mute")
     assert config[CONST_MODULE.CONF_SHUFFLE_STATE_TOPIC].endswith("shuffle_state")
     assert config[CONST_MODULE.CONF_SHUFFLE_SET_TOPIC].endswith("shuffle_set")
@@ -221,7 +227,9 @@ def test_config_schema_accepts_split_state_and_command_topics() -> None:
     assert config[CONST_MODULE.CONF_REPEAT_SET_TOPIC].endswith("repeat_set")
     assert config[CONST_MODULE.CONF_SOUND_MODE_LIST] == ["Movie", "Music"]
     assert config[CONST_MODULE.CONF_SELECT_SOURCE_TOPIC].endswith("select_source")
-    assert config[CONST_MODULE.CONF_SELECT_SOUND_MODE_TOPIC].endswith("select_sound_mode")
+    assert config[CONST_MODULE.CONF_SELECT_SOUND_MODE_TOPIC].endswith(
+        "select_sound_mode"
+    )
     assert config[CONST_MODULE.CONF_TURN_ON_TOPIC].endswith("turn_on")
     assert config[CONST_MODULE.CONF_TURN_OFF_TOPIC].endswith("turn_off")
     assert config[CONST_MODULE.CONF_PLAY_MEDIA_TOPIC].endswith("play_media")
@@ -344,10 +352,10 @@ def test_split_command_methods_publish_exact_topics_and_payloads() -> None:
     )
     publish_calls: list[tuple[str, str]] = []
 
-    async def async_publish(topic: str, payload: str) -> None:
+    async def _record(hass, topic, payload="", *args, **kwargs) -> None:
         publish_calls.append((topic, payload))
 
-    player.async_publish = async_publish
+    MEDIA_PLAYER_MODULE.mqtt.async_publish = _record
 
     asyncio.run(player.async_turn_on())
     asyncio.run(player.async_turn_off())
@@ -370,11 +378,11 @@ def test_split_command_methods_publish_exact_topics_and_payloads() -> None:
     assert publish_calls == [
         ("bridge/player/turn_on", ""),
         ("bridge/player/turn_off", ""),
-        ("bridge/player/volume_mute", "true"),
+        ("bridge/player/volume_mute", "ON"),
         ("bridge/player/play_media", publish_calls[3][1]),
         ("bridge/player/select_source", "Bluetooth"),
         ("bridge/player/select_sound_mode", "Movie"),
-        ("bridge/player/shuffle_set", "false"),
+        ("bridge/player/shuffle_set", "OFF"),
         ("bridge/player/repeat_set", "one"),
     ]
     assert play_media_payload == {
@@ -383,3 +391,18 @@ def test_split_command_methods_publish_exact_topics_and_payloads() -> None:
         "enqueue": "replace",
         "announce": True,
     }
+
+
+def test_decode_bool_payload_recognizes_and_warns(caplog) -> None:
+    player, _subscriptions, _writes = _make_player({})
+
+    assert player._decode_bool_payload("on") is True
+    assert player._decode_bool_payload("off") is False
+    assert player._decode_bool_payload("") is None
+    assert player._decode_bool_payload(None) is None
+
+    with caplog.at_level(logging.WARNING):
+        assert player._decode_bool_payload("bogus") is None
+    assert any(
+        "Unexpected boolean payload" in record.getMessage() for record in caplog.records
+    )

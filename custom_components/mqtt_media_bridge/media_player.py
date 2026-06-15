@@ -380,7 +380,15 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
         """Decode a string payload into a boolean state."""
         if payload is None:
             return None
-        return payload.lower() in ("true", "1", "yes", "on")
+        normalized = payload.strip().lower()
+        if normalized == "":
+            return None
+        if normalized in ("true", "1", "yes", "on"):
+            return True
+        if normalized in ("false", "0", "no", "off"):
+            return False
+        _LOGGER.warning("Unexpected boolean payload received: %r. Ignoring.", payload)
+        return None
 
     def _is_data_uri_image(self, url: str | None) -> bool:
         """Check if URL is an image data URI."""
@@ -649,9 +657,7 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
             )
 
         shuffle_state_topic = self._config.get(CONF_SHUFFLE_STATE_TOPIC)
-        _LOGGER.debug(
-            "📡 SUBSCRIBING TO SHUFFLE STATE TOPIC: %s", shuffle_state_topic
-        )
+        _LOGGER.debug("📡 SUBSCRIBING TO SHUFFLE STATE TOPIC: %s", shuffle_state_topic)
         if shuffle_state_topic:
             success = self.add_subscription(
                 CONF_SHUFFLE_STATE_TOPIC,
@@ -1112,8 +1118,8 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
         _LOGGER.debug("[mmb] %s publish PLAY (topic=%s)", self._log_identity(), topic)
         try:
             await mqtt.async_publish(self.hass, topic, "")
-        except Exception as e:
-            _LOGGER.error("Failed to publish play command to topic %s: %s", topic, e)
+        except Exception:
+            _LOGGER.exception("Failed to publish play command to topic %s", topic)
 
     async def async_media_pause(self) -> None:
         """Send a pause command to the media player."""
@@ -1125,8 +1131,8 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
         _LOGGER.debug("[mmb] %s publish PAUSE (topic=%s)", self._log_identity(), topic)
         try:
             await mqtt.async_publish(self.hass, topic, "")
-        except Exception as e:
-            _LOGGER.error("Failed to publish pause command to topic %s: %s", topic, e)
+        except Exception:
+            _LOGGER.exception("Failed to publish pause command to topic %s", topic)
 
     async def async_media_stop(self) -> None:
         """Send a stop command to the media player."""
@@ -1138,8 +1144,8 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
         _LOGGER.debug("[mmb] %s publish STOP (topic=%s)", self._log_identity(), topic)
         try:
             await mqtt.async_publish(self.hass, topic, "")
-        except Exception as e:
-            _LOGGER.error("Failed to publish stop command to topic %s: %s", topic, e)
+        except Exception:
+            _LOGGER.exception("Failed to publish stop command to topic %s", topic)
 
     async def async_media_next_track(self) -> None:
         """Send a next track command to the media player."""
@@ -1153,10 +1159,8 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
         _LOGGER.debug("[mmb] %s publish NEXT (topic=%s)", self._log_identity(), topic)
         try:
             await mqtt.async_publish(self.hass, topic, "")
-        except Exception as e:
-            _LOGGER.error(
-                "Failed to publish next track command to topic %s: %s", topic, e
-            )
+        except Exception:
+            _LOGGER.exception("Failed to publish next track command to topic %s", topic)
 
     async def async_media_previous_track(self) -> None:
         """Send a previous track command to the media player."""
@@ -1172,9 +1176,9 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
         )
         try:
             await mqtt.async_publish(self.hass, topic, "")
-        except Exception as e:
-            _LOGGER.error(
-                "Failed to publish previous track command to topic %s: %s", topic, e
+        except Exception:
+            _LOGGER.exception(
+                "Failed to publish previous track command to topic %s", topic
             )
 
     async def async_turn_on(self) -> None:
@@ -1189,10 +1193,8 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
         )
         try:
             await mqtt.async_publish(self.hass, topic, "")
-        except Exception as e:
-            _LOGGER.error(
-                "Failed to publish turn on command to topic %s: %s", topic, e
-            )
+        except Exception:
+            _LOGGER.exception("Failed to publish turn on command to topic %s", topic)
 
     async def async_turn_off(self) -> None:
         """Send a turn off command to the media player."""
@@ -1206,10 +1208,8 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
         )
         try:
             await mqtt.async_publish(self.hass, topic, "")
-        except Exception as e:
-            _LOGGER.error(
-                "Failed to publish turn off command to topic %s: %s", topic, e
-            )
+        except Exception:
+            _LOGGER.exception("Failed to publish turn off command to topic %s", topic)
 
     async def async_set_volume_level(self, volume: float) -> None:
         """Send a set volume level command to the media player."""
@@ -1233,9 +1233,9 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
         )
         try:
             await mqtt.async_publish(self.hass, topic, payload)
-        except Exception as e:
-            _LOGGER.error(
-                "Failed to publish volume level command to topic %s: %s", topic, e
+        except Exception:
+            _LOGGER.exception(
+                "Failed to publish volume level command to topic %s", topic
             )
 
     async def async_mute_volume(self, mute: bool) -> None:
@@ -1246,7 +1246,7 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
                 "Mute volume command called but no volume mute command topic configured"
             )
             return
-        payload = "true" if mute else "false"
+        payload = "ON" if mute else "OFF"
         _LOGGER.debug(
             "🔇 Sending MUTE VOLUME command to topic: %s, payload: %s", topic, payload
         )
@@ -1258,9 +1258,9 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
         )
         try:
             await mqtt.async_publish(self.hass, topic, payload)
-        except Exception as e:
-            _LOGGER.error(
-                "Failed to publish mute volume command to topic %s: %s", topic, e
+        except Exception:
+            _LOGGER.exception(
+                "Failed to publish mute volume command to topic %s", topic
             )
 
     async def async_play_media(
@@ -1269,7 +1269,9 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
         """Send a play media command to the media player."""
         topic = self._config.get(CONF_PLAY_MEDIA_TOPIC)
         if not topic:
-            _LOGGER.warning("Play media command called but no play media topic configured")
+            _LOGGER.warning(
+                "Play media command called but no play media topic configured"
+            )
             return
 
         payload_data: dict[str, str | bool] = {
@@ -1295,10 +1297,8 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
         )
         try:
             await mqtt.async_publish(self.hass, topic, payload)
-        except Exception as e:
-            _LOGGER.error(
-                "Failed to publish play media command to topic %s: %s", topic, e
-            )
+        except Exception:
+            _LOGGER.exception("Failed to publish play media command to topic %s", topic)
 
     async def async_select_source(self, source: str) -> None:
         """Send a select source command to the media player."""
@@ -1321,9 +1321,9 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
         )
         try:
             await mqtt.async_publish(self.hass, topic, source)
-        except Exception as e:
-            _LOGGER.error(
-                "Failed to publish select source command to topic %s: %s", topic, e
+        except Exception:
+            _LOGGER.exception(
+                "Failed to publish select source command to topic %s", topic
             )
 
     async def async_select_sound_mode(self, sound_mode: str) -> None:
@@ -1347,20 +1347,21 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
         )
         try:
             await mqtt.async_publish(self.hass, topic, sound_mode)
-        except Exception as e:
-            _LOGGER.error(
-                "Failed to publish select sound mode command to topic %s: %s",
+        except Exception:
+            _LOGGER.exception(
+                "Failed to publish select sound mode command to topic %s",
                 topic,
-                e,
             )
 
     async def async_set_shuffle(self, shuffle: bool) -> None:
         """Send a shuffle command to the media player."""
         topic = self._config.get(CONF_SHUFFLE_SET_TOPIC)
         if not topic:
-            _LOGGER.warning("Shuffle command called but no shuffle set topic configured")
+            _LOGGER.warning(
+                "Shuffle command called but no shuffle set topic configured"
+            )
             return
-        payload = "true" if shuffle else "false"
+        payload = "ON" if shuffle else "OFF"
         _LOGGER.debug(
             "🔀 Sending SHUFFLE command to topic: %s, payload: %s", topic, payload
         )
@@ -1372,10 +1373,8 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
         )
         try:
             await mqtt.async_publish(self.hass, topic, payload)
-        except Exception as e:
-            _LOGGER.error(
-                "Failed to publish shuffle command to topic %s: %s", topic, e
-            )
+        except Exception:
+            _LOGGER.exception("Failed to publish shuffle command to topic %s", topic)
 
     async def async_set_repeat(self, repeat: RepeatMode) -> None:
         """Send a repeat command to the media player."""
@@ -1395,10 +1394,8 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
         )
         try:
             await mqtt.async_publish(self.hass, topic, payload)
-        except Exception as e:
-            _LOGGER.error(
-                "Failed to publish repeat command to topic %s: %s", topic, e
-            )
+        except Exception:
+            _LOGGER.exception("Failed to publish repeat command to topic %s", topic)
 
     async def async_media_seek(self, position: float) -> None:
         """Send a seek command to the media player."""
@@ -1418,5 +1415,5 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
         )
         try:
             await mqtt.async_publish(self.hass, topic, payload)
-        except Exception as e:
-            _LOGGER.error("Failed to publish seek command to topic %s: %s", topic, e)
+        except Exception:
+            _LOGGER.exception("Failed to publish seek command to topic %s", topic)
