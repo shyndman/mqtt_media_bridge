@@ -64,8 +64,29 @@ class MqttEntity:
     pass
 
 
+class _CachedAttr:
+    """Mimic the HA CachedProperties `_attr_` semantics the bug relies on:
+    reads default to None (so hasattr() is True) and deleting a never-set
+    value raises AttributeError."""
+
+    def __set_name__(self, owner: type, name: str) -> None:
+        self._backing = f"_bk{name}"
+
+    def __get__(self, obj: object, objtype: type | None = None) -> Any:
+        if obj is None:
+            return self
+        return getattr(obj, self._backing, None)
+
+    def __set__(self, obj: object, value: Any) -> None:
+        setattr(obj, self._backing, value)
+
+    def __delete__(self, obj: object) -> None:
+        delattr(obj, self._backing)
+
+
 class MediaPlayerEntity:
-    pass
+    _attr_source_list = _CachedAttr()
+    _attr_sound_mode_list = _CachedAttr()
 
 
 class ConfigEntry:
@@ -292,6 +313,19 @@ def test_setup_from_config_does_not_enable_volume_step_without_step_value() -> N
     assert player._attr_supported_features & MediaPlayerEntityFeature.VOLUME_SET
     assert not player._attr_supported_features & MediaPlayerEntityFeature.VOLUME_STEP
     assert not hasattr(player, "_attr_volume_step")
+
+
+def test_setup_from_config_without_lists_does_not_raise() -> None:
+    player, _subscriptions, _writes = _make_player(
+        {
+            CONST_MODULE.CONF_PLAY_TOPIC: "bridge/player/play",
+        }
+    )
+
+    player._setup_from_config(player._config)
+
+    assert player._attr_source_list is None
+    assert player._attr_sound_mode_list is None
 
 
 def test_prepare_subscribe_topics_tracks_mute_shuffle_and_repeat_state() -> None:

@@ -79,6 +79,20 @@ _LOGGER = logging.getLogger(__name__)
 DATA_URI_IMAGE_PATTERN = re.compile(r"^data:image/[^;]+;base64")
 
 
+def _clear_attr(entity: MediaPlayerEntity, name: str) -> None:
+    """Revert an HA `_attr_` cached property to its default.
+
+    # DANGER! Relies on HA's CachedProperties deleter: it invalidates the
+    # cache then deletes the private backing attr, raising AttributeError
+    # when no value was ever set. We swallow that case. If HA changes this
+    # internal behavior, revisit here.
+    """
+    try:
+        delattr(entity, name)
+    except AttributeError:
+        pass
+
+
 PLATFORM_SCHEMA_MODERN = MQTT_RO_SCHEMA.extend(
     {
         # Attributes
@@ -259,20 +273,20 @@ class MqttMediaPlayer(MqttEntity, MediaPlayerEntity):
         source_list = self._config.get(CONF_SOURCE_LIST)
         if source_list is not None:
             self._attr_source_list = source_list
-        elif hasattr(self, "_attr_source_list"):
-            delattr(self, "_attr_source_list")
+        else:
+            _clear_attr(self, "_attr_source_list")
 
         sound_mode_list = self._config.get(CONF_SOUND_MODE_LIST)
         if sound_mode_list is not None:
             self._attr_sound_mode_list = sound_mode_list
-        elif hasattr(self, "_attr_sound_mode_list"):
-            delattr(self, "_attr_sound_mode_list")
+        else:
+            _clear_attr(self, "_attr_sound_mode_list")
 
         volume_step = self._config.get(CONF_VOLUME_STEP)
         if volume_step is not None:
             self._attr_volume_step = volume_step
-        elif hasattr(self, "_attr_volume_step"):
-            delattr(self, "_attr_volume_step")
+        else:
+            _clear_attr(self, "_attr_volume_step")
 
         if self._config.get(CONF_PLAY_TOPIC):
             features |= MediaPlayerEntityFeature.PLAY
